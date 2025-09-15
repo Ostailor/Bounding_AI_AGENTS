@@ -17,3 +17,7 @@ Logging
 - agent_<id>.jsonl: {t, type, side, px?, qty?, ok?}
 - run.json: configuration, seed, and environment details.
 
+Compute/Latency (M2 additions)
+- agent_<id>.jsonl 'intent' records: {t, type: "intent", intent_type, side, px?, qty?, tokens_req, tokens_used, tokens_remain, latency_ms, arrival_t, degraded}
+- Arrival execution records remain {t, type: "limit"|"market", ...} emitted at execution time (arrival tick).
+- Optional timing records: {t, type: "decision_timing", wall_ms} measuring wall-clock time to produce an intent (diagnostic only).

@@ -1,0 +1,31 @@
+{
+  "seed": 123,
+  "tick_size": 0.01,
+  "tick_duration_ms": 1.0,
+  "fee_per_message": 0.00001,
+  "fee_per_share": 0.0005,
+  "warmup_steps": 200,
+  "measure_steps": 400,
+  "out_dir": "logs/m2_runs",
+  "agents": [
+    {
+      "name": "mm_simple",
+      "class": "MarketMakerSimple",
+      "params": {"base_spread": 0.05, "size": 2, "inv_limit": 10},
+      "compute": {"capacity_tokens": 4, "refill_tokens": 4, "base_latency_ms": 0.5, "latency_ms_per_token": 0.5, "jitter_ms": 0.0}
+    },
+    {
+      "name": "zi_1",
+      "class": "ZITrader",
+      "params": {"ref_price": 100.0, "max_abs_spread": 0.5, "limit_prob": 0.8, "size_min": 1, "size_max": 3},
+      "compute": {"capacity_tokens": 2, "refill_tokens": 2, "base_latency_ms": 0.2, "latency_ms_per_token": 0.3}
+    },
+    {
+      "name": "zi_2",
+      "class": "ZITrader",
+      "params": {"ref_price": 100.1, "max_abs_spread": 0.6, "limit_prob": 0.7, "size_min": 1, "size_max": 2},
+      "compute": {"capacity_tokens": 1, "refill_tokens": 1, "base_latency_ms": 0.1, "latency_ms_per_token": 0.7}
+    }
+  ]
+}
+

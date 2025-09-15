@@ -50,7 +50,6 @@ class ZITrader(Agent):
             # align to tick size
             tick = market.cfg.tick_size
             px = round(px_raw / tick) * tick
-            market.submit_limit(self.id, side, px, size)
+            market.schedule_limit(self.id, side, px, size, tokens_requested=1)
         else:
-            market.submit_market(self.id, side, size)
-
+            market.schedule_market(self.id, side, size, tokens_requested=1)

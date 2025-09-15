@@ -24,9 +24,8 @@ class Agent:
         pass
 
     def step(self, market: Market):
-        """Called once per tick; agent may submit orders or cancels.
+        """Called once per tick; agent should schedule an intent using compute-aware APIs.
 
         Keep this non-blocking and deterministic given ctx.rng.
         """
         raise NotImplementedError
-

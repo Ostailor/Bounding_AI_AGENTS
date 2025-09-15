@@ -25,6 +25,8 @@ from agents.market_maker_simple import MarketMakerSimple
 from agents.zero_intelligence import ZITrader
 from sim.market import Market, MarketConfig
 from sim.types import Side
+from sim.compute import ComputeBudget, LatencyModel
+import time
 
 
 def load_config(path: str) -> Dict[str, Any]:
@@ -72,9 +74,10 @@ def main():
     fee_msg = float(cfg.get("fee_per_message", 0.0))
     fee_share = float(cfg.get("fee_per_share", 0.0))
 
-    agents = build_agents(cfg.get("agents", []), seed)
+    agent_specs = cfg.get("agents", [])
+    agents = build_agents(agent_specs, seed)
     agent_ids = [a.id for a in agents]
-    market = Market(MarketConfig(tick_size=tick, fee_per_message=fee_msg, fee_per_share=fee_share), agent_ids)
+    market = Market(MarketConfig(tick_size=tick, fee_per_message=fee_msg, fee_per_share=fee_share, tick_duration_ms=float(cfg.get("tick_duration_ms", 1.0))), agent_ids, rng=random.Random(seed))
 
     # Logs directory
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -98,15 +101,26 @@ def main():
         json.dump(meta, f, indent=2)
 
     market.attach_logs(out_dir)
+    # Configure compute/latency per agent (with defaults if missing)
+    for spec in agent_specs:
+        name = spec["name"]
+        comp = spec.get("compute", {})
+        budget = ComputeBudget(capacity_tokens=int(comp.get("capacity_tokens", 10)), refill_tokens=int(comp.get("refill_tokens", 10)))
+        lat = LatencyModel(base_ms=float(comp.get("base_latency_ms", 0.5)), ms_per_token=float(comp.get("latency_ms_per_token", 0.2)), jitter_ms=float(comp.get("jitter_ms", 0.0)))
+        market.set_agent_compute(name, budget, lat)
 
     # Warmup and measure loops
     for a in agents:
         a.on_start(market)
     total_steps = warmup + measure
     for t in range(total_steps):
+        market.begin_tick()
         # Each agent acts once per tick in fixed order for determinism
         for a in agents:
+            t0 = time.perf_counter()
             a.step(market)
+            dt_ms = (time.perf_counter() - t0) * 1000.0
+            market.log_decision_timing(a.id, dt_ms)
         market.step()
 
     # Episode summaries (PnL per agent)

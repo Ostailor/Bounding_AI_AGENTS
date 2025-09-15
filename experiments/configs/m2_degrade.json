@@ -1,0 +1,19 @@
+{
+  "seed": 123,
+  "tick_size": 0.01,
+  "tick_duration_ms": 1.0,
+  "fee_per_message": 0.0,
+  "fee_per_share": 0.0,
+  "warmup_steps": 5,
+  "measure_steps": 5,
+  "out_dir": "logs/m2_degrade_runs",
+  "agents": [
+    {
+      "name": "mm_simple",
+      "class": "MarketMakerSimple",
+      "params": {"base_spread": 0.05, "size": 1, "inv_limit": 10},
+      "compute": {"capacity_tokens": 0, "refill_tokens": 0, "base_latency_ms": 0.5, "latency_ms_per_token": 0.5}
+    }
+  ]
+}
+

@@ -34,14 +34,13 @@ class MarketMakerSimple(Agent):
         if state.inventory >= self.inv_limit:
             # too long, only sell
             ask = round((mid + self.base_spread) / tick) * tick
-            market.submit_limit(self.id, Side.SELL, ask, self.size)
+            market.schedule_limit(self.id, Side.SELL, ask, self.size, tokens_requested=2)
         elif state.inventory <= -self.inv_limit:
             # too short, only buy
             bid = round((mid - self.base_spread) / tick) * tick
-            market.submit_limit(self.id, Side.BUY, bid, self.size)
+            market.schedule_limit(self.id, Side.BUY, bid, self.size, tokens_requested=2)
         else:
             bid = round((mid - self.base_spread) / tick) * tick
             ask = round((mid + self.base_spread) / tick) * tick
-            market.submit_limit(self.id, Side.BUY, bid, self.size)
-            market.submit_limit(self.id, Side.SELL, ask, self.size)
-
+            market.schedule_limit(self.id, Side.BUY, bid, self.size, tokens_requested=2)
+            market.schedule_limit(self.id, Side.SELL, ask, self.size, tokens_requested=2)
