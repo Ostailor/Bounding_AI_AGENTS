@@ -1,0 +1,61 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.history/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+.python-version
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+MANIFEST
+
+# Testing / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+nosetests.xml
+junit*.xml
+htmlcov/
+
+# Project outputs and artifacts
+logs/
+analysis/figures/
+analysis/out/
+analysis/cache/
+
+# Docs build outputs
+docs/_build/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Local tooling
+.direnv/
+.envrc
+
+# Agent Files
+AGENTS.md
+tasks.md

@@ -1,0 +1,31 @@
+seed: 123
+tick_size: 0.01
+fee_per_message: 0.00001
+fee_per_share: 0.0005
+warmup_steps: 200
+measure_steps: 400
+out_dir: logs/m1_baseline
+agents:
+  - name: mm_simple
+    class: MarketMakerSimple
+    params:
+      base_spread: 0.05
+      size: 2
+      inv_limit: 10
+  - name: zi_1
+    class: ZITrader
+    params:
+      ref_price: 100.0
+      max_abs_spread: 0.5
+      limit_prob: 0.8
+      size_min: 1
+      size_max: 3
+  - name: zi_2
+    class: ZITrader
+    params:
+      ref_price: 100.1
+      max_abs_spread: 0.6
+      limit_prob: 0.7
+      size_min: 1
+      size_max: 2
+
