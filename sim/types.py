@@ -32,3 +32,5 @@ class Trade:
     price: float
     qty: int
     ts: int
+    buyer_limit: Optional[float] = None
+    seller_limit: Optional[float] = None

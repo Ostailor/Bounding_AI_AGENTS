@@ -17,3 +17,22 @@ See docs/metrics.md for metric formulas and invariants.
 - Latency: completion time = start tick + ceil((base_ms + ms_per_token * tokens_used + jitter)/tick_duration_ms).
 - Queue: a global latency queue orders arrivals by completion time and a sequence number for ties; orders execute upon arrival.
 - Instrumentation: each scheduled intent logs tokens requested/used, remaining tokens, assigned latency (ms), and arrival tick.
+
+## M3 Agents and Analysis
+
+- Model cards document behavior and compute for each agent:
+  - `docs/model_cards/TauBandTrader.md`
+  - `docs/model_cards/KGreedyTrader.md`
+  - `docs/model_cards/ShallowRLTrader.md`
+- Running and tuning sweeps:
+  - `scripts/sweep_frontier.py` varies ShallowRLTrader hyperparameters and compute budgets across seeds.
+  - `analysis/learning_curve.py` aggregates per-tick PnL to produce learning curves.
+- `analysis/plot_pnl_spread.py` plots RL PnL vs capacity and spread time series (requires matplotlib).
+ 
+## M4 Frontiers and Stability
+
+- Metrics per run (analysis/metrics_run.py): realized volatility (log-returns), kurtosis, crash probability, mean spread, message-to-trade, PnL Gini, and mean agent PnL.
+- Sweeps (scripts/sweep_m4.py): vary RL compute (capacity/refill) and optimizer share across seeds; writes per-variant aggregates with bootstrap CIs.
+- Pareto (analysis/pareto_multi.py): multi-metric undominated set over profit (maximize) and stability/liquidity (minimize spread/vol).
+- Change-points (analysis/change_point.py): segmented regression to estimate break in stability vs compute for a fixed optimizer share.
+ - Camera-ready plots: analysis/export_figures_m4.py applies consistent styling and exports PNG/PDF figures.

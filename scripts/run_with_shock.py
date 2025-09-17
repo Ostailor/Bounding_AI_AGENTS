@@ -10,14 +10,13 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any, Dict, List
 
-# Ensure repo root on path for local package imports when run as a script
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 try:
     import yaml  # type: ignore
-except Exception:  # pragma: no cover - optional
+except Exception:
     yaml = None
 
 from agents.base import AgentContext
@@ -29,7 +28,6 @@ from agents.optimizer_shallow_rl import ShallowRLTrader
 from sim.market import Market, MarketConfig
 from sim.types import Side
 from sim.compute import ComputeBudget, LatencyModel
-import time
 
 
 def load_config(path: str) -> Dict[str, Any]:
@@ -72,15 +70,16 @@ def build_agents(cfg_agents: List[Dict[str, Any]], seed: int):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Run minimal CDA/LOB simulation episode")
+    ap = argparse.ArgumentParser(description="Run sim with an explicit shock (large market order)")
     ap.add_argument("--config", required=True)
     ap.add_argument("--seed", type=int, default=123)
+    ap.add_argument("--shock_t", type=int, default=600, help="Tick to inject shock (absolute tick in episode)")
+    ap.add_argument("--shock_side", choices=["BUY", "SELL"], default="BUY")
+    ap.add_argument("--shock_qty", type=int, default=50)
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    # Prefer CLI seed for sweeps; log the chosen seed in run.json
-    seed = int(args.seed)
-    rng = random.Random(seed)
+    seed = int(cfg.get("seed", args.seed))
     warmup = int(cfg.get("warmup_steps", 1000))
     measure = int(cfg.get("measure_steps", 2000))
     tick = float(cfg.get("tick_size", 0.01))
@@ -89,32 +88,20 @@ def main():
 
     agent_specs = cfg.get("agents", [])
     agents = build_agents(agent_specs, seed)
-    agent_ids = [a.id for a in agents]
-    market = Market(MarketConfig(tick_size=tick, fee_per_message=fee_msg, fee_per_share=fee_share, tick_duration_ms=float(cfg.get("tick_duration_ms", 1.0))), agent_ids, rng=random.Random(seed))
+    # Add shock agent id to market state for accounting
+    agent_ids = [a.id for a in agents] + ["shock"]
+    market = Market(MarketConfig(tick_size=tick, fee_per_message=fee_msg, fee_per_share=fee_share, tick_duration_ms=float(cfg.get("tick_duration_ms", 1.0))), agent_ids)
 
     # Logs directory
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     out_base = cfg.get("out_dir", "logs/runs")
-    # Always write to a per-run timestamped folder (include seed to avoid collisions)
     out_dir = os.path.join(out_base, f"{ts}_seed{seed}")
     os.makedirs(out_dir, exist_ok=True)
-    # Minimal run metadata
-    meta = {
-        "seed": seed,
-        "config_path": os.path.abspath(args.config),
-        "tick_size": tick,
-        "fee_per_message": fee_msg,
-        "fee_per_share": fee_share,
-        "warmup_steps": warmup,
-        "measure_steps": measure,
-        "agents": [spec for spec in cfg.get("agents", [])],
-        "datetime_utc": ts,
-    }
     with open(os.path.join(out_dir, "run.json"), "w") as f:
-        json.dump(meta, f, indent=2)
+        json.dump({**cfg, "shock": {"t": args.shock_t, "side": args.shock_side, "qty": args.shock_qty}, "datetime_utc": ts}, f, indent=2)
 
     market.attach_logs(out_dir)
-    # Configure compute/latency per agent (with defaults if missing)
+    # Configure compute/latency per agent
     for spec in agent_specs:
         base_name = spec["name"]
         count = int(spec.get("count", 1))
@@ -127,34 +114,34 @@ def main():
             for i in range(count):
                 name = f"{base_name}_{i+1}"
                 market.set_agent_compute(name, budget, lat)
+    # Shock agent fast/no compute
+    market.set_agent_compute("shock", ComputeBudget(capacity_tokens=1_000_000, refill_tokens=1_000_000), LatencyModel(base_ms=0.0, ms_per_token=0.0))
 
-    # Warmup and measure loops
     for a in agents:
         a.on_start(market)
     total_steps = warmup + measure
-    for t in range(total_steps):
+    shock_side = Side[args.shock_side]
+    for _ in range(total_steps):
         market.begin_tick()
-        # Each agent acts once per tick in fixed order for determinism
         for a in agents:
-            t0 = time.perf_counter()
             a.step(market)
-            dt_ms = (time.perf_counter() - t0) * 1000.0
-            market.log_decision_timing(a.id, dt_ms)
+        # Inject shock at chosen tick (absolute)
+        if market.t + 1 == args.shock_t:
+            market.schedule_market("shock", shock_side, int(args.shock_qty), tokens_requested=1)
         market.step()
-        # Log per-agent PnL each tick for learning curve diagnostics
+        # PnL logs
         for aid in agent_ids:
             market.log_pnl(aid, market.mark_to_market(aid))
 
-    # Episode summaries (PnL per agent)
+    # Summaries
     summaries = []
     for aid in agent_ids:
         pnl = market.mark_to_market(aid)
         summaries.append({"agent": aid, "pnl": pnl, "cash": market.agents[aid].cash, "inv": market.agents[aid].inventory})
     with open(os.path.join(out_dir, "summary.json"), "w") as f:
         json.dump({"summaries": summaries}, f, indent=2)
-
     market.close_logs()
-    print(f"Completed run. Logs at: {out_dir}")
+    print(f"Completed shock run. Logs at: {out_dir}")
 
 
 if __name__ == "__main__":

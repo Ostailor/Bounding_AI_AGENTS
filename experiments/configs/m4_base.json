@@ -1,0 +1,17 @@
+{
+  "seed": 123,
+  "tick_size": 0.01,
+  "tick_duration_ms": 1.0,
+  "fee_per_message": 0.00001,
+  "fee_per_share": 0.0005,
+  "warmup_steps": 500,
+  "measure_steps": 1000,
+  "out_dir": "logs/m4_base",
+  "agents": [
+    {"name": "mm", "class": "MarketMakerSimple", "count": 4, "params": {"base_spread": 0.05, "size": 1, "inv_limit": 20}, "compute": {"capacity_tokens": 2, "refill_tokens": 2, "base_latency_ms": 0.5, "latency_ms_per_token": 0.4}},
+    {"name": "zi", "class": "ZITrader", "count": 4, "params": {"ref_price": 100.0, "max_abs_spread": 0.4, "limit_prob": 0.7, "size_min": 1, "size_max": 2}, "compute": {"capacity_tokens": 2, "refill_tokens": 2, "base_latency_ms": 0.2, "latency_ms_per_token": 0.3}},
+    {"name": "kg", "class": "KGreedyTrader", "count": 6, "params": {"include_market": false, "k": 3, "epsilon": 0.1, "size": 1, "tokens_per_eval": 1, "inv_penalty": 0.02}, "compute": {"capacity_tokens": 4, "refill_tokens": 4, "base_latency_ms": 0.3, "latency_ms_per_token": 0.2}},
+    {"name": "tb", "class": "TauBandTrader", "count": 4, "params": {"ref_mode": "mid", "tau": 0.05, "size": 1, "limit_only": true, "inv_limit": 30, "tokens_per_decision": 1}, "compute": {"capacity_tokens": 2, "refill_tokens": 2, "base_latency_ms": 0.2, "latency_ms_per_token": 0.3}},
+    {"name": "rl", "class": "ShallowRLTrader", "count": 6, "params": {"include_market": false, "size": 1, "epsilon": 0.02, "alpha": 0.01, "inv_penalty": 0.02, "tokens_per_eval": 4, "tokens_per_update": 1}, "compute": {"capacity_tokens": 8, "refill_tokens": 8, "base_latency_ms": 0.1, "latency_ms_per_token": 0.2}}
+  ]
+}

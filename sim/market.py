@@ -44,16 +44,22 @@ class Market:
         self._logs_root: Optional[str] = None
         self._agent_logs: Dict[AgentId, any] = {}
         self._steps_log = None
+        self._trades_log = None
         self._rng = rng or random.Random(0)
         # Compute + latency
         self._compute: Dict[AgentId, AgentComputeState] = {}
         self._latq = LatencyQueue()
+        # Per-tick counters for analysis
+        self._trades_this_tick: int = 0
+        self._volume_this_tick: int = 0
+        self._messages_this_tick: int = 0
 
     # --- Logging setup ---
     def attach_logs(self, root_dir: str):
         os.makedirs(root_dir, exist_ok=True)
         self._logs_root = root_dir
         self._steps_log = open(os.path.join(root_dir, "steps.jsonl"), "w")
+        self._trades_log = open(os.path.join(root_dir, "trades.jsonl"), "w")
         for aid in self.agents:
             path = os.path.join(root_dir, f"agent_{aid}.jsonl")
             self._agent_logs[aid] = open(path, "w")
@@ -61,20 +67,31 @@ class Market:
     def close_logs(self):
         if self._steps_log:
             self._steps_log.close()
+        if self._trades_log:
+            self._trades_log.close()
         for f in self._agent_logs.values():
             f.close()
 
     def _log_step(self, payload: dict):
         if self._steps_log:
             self._steps_log.write(json.dumps(payload) + "\n")
+            self._steps_log.flush()
 
     def _log_agent(self, agent_id: AgentId, payload: dict):
         f = self._agent_logs.get(agent_id)
         if f:
             f.write(json.dumps(payload) + "\n")
+            f.flush()
 
     def log_decision_timing(self, agent_id: AgentId, wall_ms: float):
         self._log_agent(agent_id, {"t": self.t, "type": "decision_timing", "wall_ms": wall_ms})
+
+    def log_pnl(self, agent_id: AgentId, pnl: float):
+        """Public helper to log per-agent PnL at current tick.
+
+        Analysis scripts can aggregate these to produce learning curves.
+        """
+        self._log_agent(agent_id, {"t": self.t, "type": "pnl", "pnl": pnl})
 
     # --- Compute / latency setup ---
     def set_agent_compute(self, agent_id: AgentId, budget: ComputeBudget, latency: LatencyModel):
@@ -129,12 +146,18 @@ class Market:
         return ok
 
     def _charge_message_fee(self, agent_id: AgentId):
+        # Count message
+        self._messages_this_tick += 1
+        # Apply fee (may be zero)
         self.agents[agent_id].cash -= self.cfg.fee_per_message
 
     def _apply_trades(self, initiator: AgentId, side: Side, trades: List[Trade], taker: bool = False):
         for tr in trades:
             self._last_trade_price = tr.price
             qty = tr.qty
+            # Counters
+            self._trades_this_tick += 1
+            self._volume_this_tick += qty
             # Update buyer
             b = tr.buy_agent_id
             s = tr.sell_agent_id
@@ -152,6 +175,18 @@ class Market:
                 self.agents[b].cash -= self.cfg.fee_per_share * qty
             elif s == taker_agent:
                 self.agents[s].cash -= self.cfg.fee_per_share * qty
+            # Log trade record for analysis
+            if self._trades_log:
+                self._trades_log.write(json.dumps({
+                    "t": self.t,
+                    "price": tr.price,
+                    "qty": qty,
+                    "buy_agent": b,
+                    "sell_agent": s,
+                    "taker_agent": taker_agent,
+                    "taker_side": side.value
+                }) + "\n")
+                self._trades_log.flush()
 
     # --- Intent scheduling (compute + latency) ---
     def schedule_limit(self, agent_id: AgentId, side: Side, price: float, qty: int, tokens_requested: int):
@@ -215,6 +250,10 @@ class Market:
     def step(self):
         # advance time
         self.t += 1
+        # reset per-tick counters
+        self._trades_this_tick = 0
+        self._volume_this_tick = 0
+        self._messages_this_tick = 0
         # process arrivals scheduled for this tick
         arrivals = self._latq.pop_ready(self.t)
         for ev in arrivals:
@@ -252,6 +291,9 @@ class Market:
             "depth5_bid": depth5_bid,
             "depth5_ask": depth5_ask,
             "last_trade": self._last_trade_price,
+            "num_trades": self._trades_this_tick,
+            "trade_volume": self._volume_this_tick,
+            "num_messages": self._messages_this_tick,
         }
         self._log_step(payload)
         return payload

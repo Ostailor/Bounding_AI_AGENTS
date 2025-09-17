@@ -74,7 +74,7 @@ class OrderBook:
                 if order.price < best_ask.price:
                     break
                 trades_made, filled = self._execute_against(
-                    best_ask, remaining, take_side=Side.BUY, ts=order.ts, taker_agent=order.agent_id
+                    best_ask, remaining, take_side=Side.BUY, ts=order.ts, taker_agent=order.agent_id, taker_limit=order.price
                 )
                 trades.extend(trades_made)
                 remaining -= filled
@@ -87,7 +87,7 @@ class OrderBook:
                 if order.price > best_bid.price:
                     break
                 trades_made, filled = self._execute_against(
-                    best_bid, remaining, take_side=Side.SELL, ts=order.ts, taker_agent=order.agent_id
+                    best_bid, remaining, take_side=Side.SELL, ts=order.ts, taker_agent=order.agent_id, taker_limit=order.price
                 )
                 trades.extend(trades_made)
                 remaining -= filled
@@ -123,7 +123,7 @@ class OrderBook:
                 best_ask = self._best_ask()
                 assert best_ask is not None
                 trades_made, filled = self._execute_against(
-                    best_ask, remaining, take_side=Side.BUY, ts=order.ts, taker_agent=order.agent_id
+                    best_ask, remaining, take_side=Side.BUY, ts=order.ts, taker_agent=order.agent_id, taker_limit=None
                 )
                 trades.extend(trades_made)
                 remaining -= filled
@@ -134,7 +134,7 @@ class OrderBook:
                 best_bid = self._best_bid()
                 assert best_bid is not None
                 trades_made, filled = self._execute_against(
-                    best_bid, remaining, take_side=Side.SELL, ts=order.ts, taker_agent=order.agent_id
+                    best_bid, remaining, take_side=Side.SELL, ts=order.ts, taker_agent=order.agent_id, taker_limit=None
                 )
                 trades.extend(trades_made)
                 remaining -= filled
@@ -168,7 +168,7 @@ class OrderBook:
 
     # --- Matching core ---
     def _execute_against(
-        self, level: PriceLevel, qty: int, take_side: Side, ts: int, taker_agent: str
+        self, level: PriceLevel, qty: int, take_side: Side, ts: int, taker_agent: str, taker_limit: Optional[float]
     ) -> Tuple[List[Trade], int]:
         trades: List[Trade] = []
         remaining = qty
@@ -186,6 +186,8 @@ class OrderBook:
                         price=price,
                         qty=traded,
                         ts=ts,
+                        buyer_limit=taker_limit,
+                        seller_limit=resting.price,
                     )
                 )
             else:
@@ -198,6 +200,8 @@ class OrderBook:
                         price=price,
                         qty=traded,
                         ts=ts,
+                        buyer_limit=resting.price,
+                        seller_limit=taker_limit,
                     )
                 )
             remaining -= traded
