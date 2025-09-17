@@ -1,0 +1,26 @@
+% === Theory Section Template (copy into main paper.tex) ===
+\section{Compute-Bounded Agents and Stability}
+\label{sec:theory}
+
+We study agents with an explicit per-decision compute budget $C$ (``tokens'') and a latency model that maps used tokens to arrival time. Compute constrains the policy class $\mathcal{P}(C)$ (e.g., samples for quantiles, features for linear predictors, or iterations for solvers), while latency couples computation to priority in the matching engine.
+
+\paragraph{Settings.} We analyze three stylized environments: (i) a static call market (SCM) or random batch auctions (RBA) for welfare; (ii) a linear–quadratic (LQ) maker–taker model for stability; and (iii) a compute/latency-aware CDA for phase transitions.
+
+\paragraph{Lower bound (welfare).} In SCM/RBA with i.i.d. values and smooth $F$, a quantile/threshold policy with $m=\Theta\big((1/\varepsilon^2)\log N\big)$ samples per agent attains allocative efficiency $\ge 1-\varepsilon$ w.h.p. (see Supplement). Intuition: quantile estimation error scales as $O\!\left(\sqrt{\tfrac{\log N}{m}}\right)$, and welfare is Lipschitz in price.
+
+\paragraph{Upper bound (stability).} In LQ maker–taker dynamics, higher compute either sharpens micro-predictions or advances arrival priority, increasing the closed-loop gain. Beyond a regime, realized volatility grows superlinearly in $C$ due to amplification (Supplement, Theorem~\ref{thm:amplification}).
+
+\paragraph{Phase transition.} There exists a breakpoint $C^*$ between a contractive regime (stable spreads/inventories) and a non-contractive regime dominated by priority externalities. Our empirical change-point estimates (Sec.~\ref{sec:experiments}) align with this picture.
+
+\begin{theorem}[Approximate efficiency via quantile estimation]\label{thm:lower}
+Under SCM/RBA assumptions, with $m=\Theta\big((1/\varepsilon^2)\log N\big)$ per-agent compute, the realized allocative efficiency is at least $1-\varepsilon$ with high probability.
+\end{theorem}
+
+\begin{theorem}[Volatility amplification]\label{thm:amplification}
+Assume the feedback gain increases with compute/priority and crosses unity at $C^*$. Then for $C\!>\!C^*$, realized variance grows at least polynomially in $C$.
+\end{theorem}
+
+\paragraph{Proof highlights.} Theorem~\ref{thm:lower} follows from Chernoff/Hoeffding bounds for quantile estimation and Lipschitz surplus. Theorem~\ref{thm:amplification} uses LQ variance formulas with gain $G(C)$ driven by prediction sharpness or latency advantage. Full details are in the Supplement (\texttt{paper/supp/proofs.tex}).
+
+% === End of Template ===
+

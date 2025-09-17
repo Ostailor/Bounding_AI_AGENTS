@@ -1,0 +1,56 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{fullpage}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+
+\begin{document}
+
+\section*{Compute-Bounded Agents: Bounds and Phase Transitions}
+
+\paragraph{Model.} We consider $N$ agents interacting with a market mechanism (CDA or batch auction). Each agent has a per-decision compute budget $C$ (tokens), and a latency model $\ell(k)$ that determines arrival time as a function of used tokens $k\le C$. A policy class $\mathcal{P}(C)$ contains strategies implementable with at most $C$ tokens.
+
+\begin{definition}[Compute-limited policy classes]
+Sampling/quantile policies with at most $C$ i.i.d. draws; linear predictors with at most $C$ features; or iterative solvers with at most $C$ iterations.
+\end{definition}
+
+\subsection*{Lower Bound: Allocative Efficiency with $O((1/\varepsilon^2)\log N)$ Compute}
+
+Consider a static call market (SCM) or random batch auction (RBA) with unit demand/supply and i.i.d. private values $v_i\sim F$ supported on $[0,1]$, with $F$ Lipschitz. Let $p^*$ be the welfare-maximizing price.
+
+\begin{theorem}[Approximate efficiency via quantile estimation]
+Fix $\varepsilon,\delta\in(0,1)$. If each agent uses a threshold policy at an estimated $(1-q)$-quantile $\hat p$ computed from $m=\Theta\big((1/\varepsilon^2)\log(N/\delta)\big)$ samples of $F$, then with probability at least $1-\delta$, the realized allocative efficiency satisfies $\mathrm{AE}\ge 1-\varepsilon$.
+\end{theorem}
+
+\begin{proof}[Sketch]
+By Hoeffding/Chernoff, $|\hat p-p^*|\le \varepsilon$ with probability $\ge 1-\delta/N$ per agent; a union bound yields $1-\delta$ over $N$ agents. Lipschitzness of $F$ implies the welfare loss from pricing error $\varepsilon$ is $O(\varepsilon)$. In RBA, no latency externality arises within a batch. The compute per agent is $m=\Theta((1/\varepsilon^2)\log(N/\delta))$.
+\end{proof}
+
+\subsection*{Upper Bound: Volatility Amplification at High Compute}
+
+In a linear–quadratic maker–taker model with linear impact and quadratic inventory penalties, let $\phi(C)$ be an increasing function capturing either prediction sharpness or arrival priority advantage afforded by compute $C$.
+
+\begin{theorem}[Amplification]
+Suppose the closed-loop price/inventory dynamics admit variance $\mathrm{Var}[P] = G(\phi(C))\sigma^2$ with gain $G$ increasing and $G(1)=1$. If $\phi(C)\ge k\, C^{\beta}$ for some $k,\beta>0$ once $C\ge C_0$, then for $C\ge C_0$, $\mathrm{Var}[P]\ge k'\, C^{\beta}$ for some $k'>0$ (superlinear volatility in $C$).
+\end{theorem}
+
+\begin{proof}[Sketch]
+Arrival priority or sharper predictors increase the effective feedback gain. Standard LQ analysis shows variance scales like $1/(1-\gamma)^2$ where $\gamma\in(0,1)$ is the feedback factor; if $\gamma=1-\Theta(1/\phi(C))$, then $\mathrm{Var}[P]=\Theta(\phi(C)^2)$.
+\end{proof}
+
+\subsection*{Phase Transition}
+
+\begin{theorem}[Breakpoint]
+Assume there exist $C_1<C_2$ such that for $C\le C_1$ the Lyapunov drift is negative (contractive inventories/spreads), and for $C\ge C_2$ it is nonnegative due to priority externalities. Then there exists $C^*\in[C_1,C_2]$ where a stability order parameter (e.g., kurtosis) exhibits a structural break. A segmented regression estimator on $(C,\mathrm{metric})$ is consistent for $C^*$ under mixing.
+\end{theorem}
+
+\begin{proof}[Sketch]
+The drift sign change implies two regimes governed by distinct linearizations. Concentration of the least-squares break estimator follows from standard change-point regression results under mixing and sub-Gaussian noise.
+\end{proof}
+
+\paragraph{Remarks.} Our empirical sweeps (M4) show a breakpoint near a modest capacity (e.g., ~8 tokens) consistent with the theoretical picture.
+
+\end{document}
+

@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: "Welfare and Stability Frontiers in Algorithmic Trading (Sim + Analysis)"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: Tailor
+    given-names: Om
+repository-code: https://github.com/Otailor/Bounding_AI_Finance
+license: Apache-2.0
+version: 0.1.0
+date-released: 2025-09-17
+

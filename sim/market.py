@@ -31,6 +31,10 @@ class MarketConfig:
     fee_per_message: float = 0.0
     fee_per_share: float = 0.0  # taker fee per share for marketable volume
     tick_duration_ms: float = 1.0
+    latency_floor_ms: float = 0.0
+    batch_interval_ticks: int = 1  # 1=CDA; >1 batches arrivals every K ticks
+    message_limit_per_tick: int = 0  # 0 means unlimited
+    min_resting_ticks: int = 0
 
 
 class Market:
@@ -53,6 +57,8 @@ class Market:
         self._trades_this_tick: int = 0
         self._volume_this_tick: int = 0
         self._messages_this_tick: int = 0
+        self._msg_count_by_agent: Dict[AgentId, int] = {a: 0 for a in agent_ids}
+        self._order_created_ts: Dict[int, int] = {}
 
     # --- Logging setup ---
     def attach_logs(self, root_dir: str):
@@ -100,6 +106,8 @@ class Market:
     def begin_tick(self):
         for st in self._compute.values():
             st.refill()
+        for aid in self._msg_count_by_agent:
+            self._msg_count_by_agent[aid] = 0
 
     # --- Orders ---
     def _new_order_id(self) -> int:
@@ -108,6 +116,9 @@ class Market:
         return oid
 
     def submit_limit(self, agent_id: AgentId, side: Side, price: float, qty: int) -> List[Trade]:
+        if self.cfg.message_limit_per_tick > 0 and self._msg_count_by_agent.get(agent_id, 0) >= self.cfg.message_limit_per_tick:
+            self._log_agent(agent_id, {"t": self.t, "type": "reject", "reason": "message_limit", "intent": "limit", "side": side.value, "px": price, "qty": qty})
+            return []
         self._charge_message_fee(agent_id)
         order = Order(
             id=self._new_order_id(),
@@ -118,12 +129,16 @@ class Market:
             ts=self.t,
             is_market=False,
         )
+        self._order_created_ts[order.id] = self.t
         trades = self.book.place_limit(order)
         self._apply_trades(agent_id, side, trades)
         self._log_agent(agent_id, {"t": self.t, "type": "limit", "side": side.value, "px": price, "qty": qty})
         return trades
 
     def submit_market(self, agent_id: AgentId, side: Side, qty: int) -> List[Trade]:
+        if self.cfg.message_limit_per_tick > 0 and self._msg_count_by_agent.get(agent_id, 0) >= self.cfg.message_limit_per_tick:
+            self._log_agent(agent_id, {"t": self.t, "type": "reject", "reason": "message_limit", "intent": "market", "side": side.value, "qty": qty})
+            return []
         self._charge_message_fee(agent_id)
         order = Order(
             id=self._new_order_id(),
@@ -140,6 +155,14 @@ class Market:
         return trades
 
     def cancel(self, agent_id: AgentId, order_id: int) -> bool:
+        if self.cfg.message_limit_per_tick > 0 and self._msg_count_by_agent.get(agent_id, 0) >= self.cfg.message_limit_per_tick:
+            self._log_agent(agent_id, {"t": self.t, "type": "reject", "reason": "message_limit", "intent": "cancel", "order_id": order_id})
+            return False
+        if self.cfg.min_resting_ticks > 0:
+            created = self._order_created_ts.get(order_id)
+            if created is not None and (self.t - created) < self.cfg.min_resting_ticks:
+                self._log_agent(agent_id, {"t": self.t, "type": "reject", "reason": "min_resting_time", "intent": "cancel", "order_id": order_id})
+                return False
         self._charge_message_fee(agent_id)
         ok = self.book.cancel(order_id)
         self._log_agent(agent_id, {"t": self.t, "type": "cancel", "order_id": order_id, "ok": ok})
@@ -148,6 +171,7 @@ class Market:
     def _charge_message_fee(self, agent_id: AgentId):
         # Count message
         self._messages_this_tick += 1
+        self._msg_count_by_agent[agent_id] = self._msg_count_by_agent.get(agent_id, 0) + 1
         # Apply fee (may be zero)
         self.agents[agent_id].cash -= self.cfg.fee_per_message
 
@@ -203,6 +227,7 @@ class Market:
             return
         used, degraded = st.consume(tokens_requested)
         latency_ms = st.latency.base_ms + used * st.latency.ms_per_token
+        latency_ms = max(self.cfg.latency_floor_ms, latency_ms)
         if st.latency.jitter_ms > 0:
             # symmetric jitter
             jitter = (self._rng.random() * 2 - 1) * st.latency.jitter_ms
@@ -233,6 +258,7 @@ class Market:
             return
         used, degraded = st.consume(tokens_requested)
         latency_ms = st.latency.base_ms + used * st.latency.ms_per_token
+        latency_ms = max(self.cfg.latency_floor_ms, latency_ms)
         if st.latency.jitter_ms > 0:
             jitter = (self._rng.random() * 2 - 1) * st.latency.jitter_ms
             latency_ms = max(0.0, latency_ms + jitter)
@@ -254,8 +280,10 @@ class Market:
         self._trades_this_tick = 0
         self._volume_this_tick = 0
         self._messages_this_tick = 0
-        # process arrivals scheduled for this tick
-        arrivals = self._latq.pop_ready(self.t)
+        # process arrivals scheduled for this tick (batch if configured)
+        arrivals: List[ScheduledIntent] = []
+        if self.cfg.batch_interval_ticks <= 1 or (self.t % self.cfg.batch_interval_ticks == 0):
+            arrivals = self._latq.pop_ready(self.t)
         for ev in arrivals:
             if ev.intent_type == "limit":
                 self.submit_limit(ev.agent_id, ev.side, float(ev.price), int(ev.qty))

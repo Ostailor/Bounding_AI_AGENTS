@@ -38,4 +38,19 @@ fi
 echo "[Summary] Generating Markdown frontier summary"
 python3 "$ROOT/analysis/summarize_frontiers_md.py" --m3_dir "$ROOT/analysis/out/frontier_sweep_overnight" --m4_dir "$ROOT/analysis/out/m4_frontier_mid" --out "$ROOT/analysis/out/frontier_summary.md"
 
+echo "[Summary] Exporting LaTeX table for M4 Pareto"
+python3 "$ROOT/analysis/export_pareto_table_tex.py" --pareto_csv "$ROOT/analysis/out/m4_frontier_mid/pareto_multi.csv" --out_tex "$ROOT/paper/tables/pareto_m4.tex" --max_rows 10
+
+# Optional M6 policy sweeps: set RUN_M6=1 or pass --m6
+if [ "${RUN_M6:-0}" = "1" ] || [ "${1:-}" = "--m6" ]; then
+  echo "[M6] Running policy sweeps"
+  python3 "$ROOT/scripts/sweep_m6_policies.py" --base_config "$ROOT/experiments/configs/m4_base.json" --seeds 200 201 202 203 204 205 206 207 208 209 --out_dir "$ROOT/analysis/out/m6_policies"
+  echo "[M6] Plotting policy deltas"
+  python3 "$ROOT/analysis/plot_m6.py" --index_csv "$ROOT/analysis/out/m6_policies/index.csv" --out_dir "$ROOT/analysis/out/m6_policies/plots"
+  echo "[M6] Exporting LaTeX table for policies"
+  python3 "$ROOT/analysis/export_policies_table_tex.py" --index_csv "$ROOT/analysis/out/m6_policies/index.csv" --out_tex "$ROOT/paper/tables/policies_m6.tex"
+  echo "[Summary] Updating Markdown summary with M6"
+  python3 "$ROOT/analysis/summarize_frontiers_md.py" --m3_dir "$ROOT/analysis/out/frontier_sweep_overnight" --m4_dir "$ROOT/analysis/out/m4_frontier_mid" --m6_dir "$ROOT/analysis/out/m6_policies" --out "$ROOT/analysis/out/frontier_summary.md"
+fi
+
 echo "Reproduction complete. Outputs under analysis/out/."
